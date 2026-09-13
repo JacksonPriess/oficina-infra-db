@@ -23,6 +23,10 @@ A infraestrutura de rede e Kubernetes é provisionada separadamente no repositó
 - AWS Secrets Manager
 - GitHub Actions
 
+## Arquitetura
+
+![Arquitetura da infraestrutura de banco](docs/architecture/oficina-infra-db-architecture.drawio.png)
+
 ## Estrutura
 
 ```text
@@ -52,10 +56,10 @@ Por isso, a infraestrutura Kubernetes deve ser provisionada antes do banco de da
 
 ## Execução local
 
-Configure o profile AWS utilizado no LAB:
+Configure o profile AWS se necessário :
 
 ```powershell
-$env:AWS_PROFILE="pos"
+$env:AWS_PROFILE="profile"
 ```
 
 Acesse a pasta Terraform:
