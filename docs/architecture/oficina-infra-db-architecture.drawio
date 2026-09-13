@@ -1,0 +1,133 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="infra-db" name="Arquitetura oficina-infra-db">
+    <mxGraphModel dx="1664" dy="1864" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="950" background="light-dark(#ffffff, #121212)" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontSize=18;" value="oficina-infra-db — Arquitetura específica do repositório" vertex="1">
+          <mxGeometry height="50" width="700" x="290" y="-20" as="geometry" />
+        </mxCell>
+        <mxCell id="github" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="GitHub Actions terraform.yml" vertex="1">
+          <mxGeometry height="90" width="220" x="20" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="terraform" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="Terraform Infraestrutura de Banco" vertex="1">
+          <mxGeometry height="90" width="240" x="330" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" value="Amazon S3 Terraform Remote State infra/db/terraform.tfstate" vertex="1">
+          <mxGeometry height="100" width="260" x="320" y="425" as="geometry" />
+        </mxCell>
+        <mxCell id="k8sstate" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;" value="Remote State oficina-infra-k8s VPC + Subnets" vertex="1">
+          <mxGeometry height="100" width="220" x="20" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="vpc" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=top;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" value="VPC (provisionada no oficina-infra-k8s)" vertex="1">
+          <mxGeometry height="570" width="620" x="700" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="dbsubnet" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="DB Subnet Group Subnets obtidas via Remote State" vertex="1">
+          <mxGeometry height="90" width="500" x="760" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="sg" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="Security Group do Banco Acesso PostgreSQL / 5432" vertex="1">
+          <mxGeometry height="80" width="210" x="730" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="rds" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" value="Amazon RDS PostgreSQL oficina_db" vertex="1">
+          <mxGeometry height="90" width="210" x="1030" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="secrets" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="AWS Secrets Manager Secret da credencial master gerenciado pelo RDS" vertex="1">
+          <mxGeometry height="80" width="210" x="1050" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="consumers" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;" value="Consumidores externos Spring Boot / Auth Lambda" vertex="1">
+          <mxGeometry height="100" width="260" x="140" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="outputs" parent="1" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="Terraform Outputs endpoint • porta • database_name • secret_arn" vertex="1">
+          <mxGeometry height="90" width="520" x="700" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="github" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="terraform" value="CI/CD">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="terraform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" target="s3" value="salva estado">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="k8sstate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" target="terraform" value="VPC / Subnets">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="130" y="310" />
+              <mxPoint x="340" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="terraform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="dbsubnet" value="provisiona">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="450" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="terraform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="sg" value="provisiona">
+          <mxGeometry relative="1" x="-0.5556" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="760" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="terraform" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="rds" value="provisiona">
+          <mxGeometry relative="1" x="-0.7419" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1100" y="230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="dbsubnet" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="rds" value="define subnets">
+          <mxGeometry relative="1" y="15" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1145" y="230" />
+              <mxPoint x="1145" y="230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="sg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="rds" value="controla acesso">
+          <mxGeometry relative="1" x="0.1111" y="15" as="geometry">
+            <mxPoint x="1" as="offset" />
+            <Array as="points">
+              <mxPoint x="960" y="365" />
+              <mxPoint x="960" y="365" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="rds" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;" target="secrets" value="gera / gerencia credencial">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1155" y="440" />
+              <mxPoint x="1155" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="rds" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" target="outputs" value="expõe endpoint / porta">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="960" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="secrets" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" target="outputs" value="expõe secret_arn">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1155" y="690" />
+              <mxPoint x="1155" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="outputs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" target="consumers" value="dados consumidos por outros repositórios">
+          <mxGeometry relative="1" x="0.0166" y="-30" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="470" y="765.06" />
+              <mxPoint x="470" y="765.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
