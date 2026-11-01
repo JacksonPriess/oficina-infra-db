@@ -33,7 +33,7 @@ A infraestrutura de rede e Kubernetes é provisionada separadamente no repositó
 .
 ├── .github/
 │   └── workflows/
-│       └── terraform.yml
+│       └── terraform.yaml
 ├── terraform/
 │   ├── backend.tf
 │   ├── database.tf
@@ -99,7 +99,7 @@ terraform apply
 O estado remoto deste projeto é armazenado no Amazon S3:
 
 ```text
-Bucket: oficina-state-priess951
+Bucket: oficina-state-priess952
 Key: infra/db/terraform.tfstate
 Region: us-east-1
 ```
@@ -115,7 +115,7 @@ Nenhuma senha do banco deve ser armazenada diretamente no código, em arquivos `
 A pipeline GitHub Actions está localizada em:
 
 ```text
-.github/workflows/terraform.yml
+.github/workflows/terraform.yaml
 ```
 
 ### Pull Request para `main`
