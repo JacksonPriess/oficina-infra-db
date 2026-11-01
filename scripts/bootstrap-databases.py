@@ -1,3 +1,35 @@
+#!/usr/bin/env python3
+"""Provisiona bancos dentro da VPC, sem colocar senhas em argumentos ou arquivos."""
+import base64
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+NAMESPACE = os.environ.get("K8S_NAMESPACE", "default")
+REGION = os.environ.get("AWS_REGION", "us-east-1")
+NAME = "oficina-database-bootstrap"
+SENSITIVE_VALUES = set()
+
+
+def redact(value):
+    secrets = SENSITIVE_VALUES | {
+        os.environ.get(key, "") for key in (
+            "NUCLEO_DB_PASSWORD", "CATALOGO_DB_PASSWORD", "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
+        )
+    }
+    representations = set()
+    for secret_value in secrets - {""}:
+        representations.update((secret_value, secret_value.replace("'", "''"),
+                                json.dumps(secret_value)[1:-1],
+                                base64.b64encode(secret_value.encode()).decode()))
+    for representation in sorted(representations, key=len, reverse=True):
+        value = value.replace(representation, "[REDACTED]")
+    return value
+
 
 def command(*args, payload=None):
     try:
@@ -126,3 +158,4 @@ if __name__ == "__main__":
         sys.exit(1)
     except (ValueError, KeyError) as error:
         print(f"Configuracao invalida: {error}", file=sys.stderr)
+        sys.exit(1)
