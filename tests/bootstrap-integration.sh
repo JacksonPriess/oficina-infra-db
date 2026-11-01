@@ -12,9 +12,25 @@ export PGPASSWORD=admin-test-only
 export BOOTSTRAP_DIR="$PWD/bootstrap"
 sh bootstrap/run.sh
 
-# Regressao: o criador mantem ADMIN OPTION e pode herdar/assumir ambas as roles.
-memberships=$(psql -X -w -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid WHERE m.member = current_user::regrole AND r.rolname IN ('nucleo_app', 'catalogo_produto_app') AND m.admin_option AND m.inherit_option AND m.set_option")
-[ "$memberships" = 2 ]
+# Regressao: valida privilegios efetivos, mesmo com grantors diferentes.
+memberships=$(psql -X -w -At -v ON_ERROR_STOP=1 <<'SQL'
+SELECT count(*)
+FROM pg_roles r
+WHERE r.rolname IN ('nucleo_app', 'catalogo_produto_app')
+  AND pg_has_role(current_user, r.oid, 'USAGE')
+  AND pg_has_role(current_user, r.oid, 'SET')
+  AND EXISTS (
+      SELECT FROM pg_auth_members m
+      WHERE m.roleid = r.oid
+        AND m.member = current_user::regrole
+        AND m.admin_option
+  );
+SQL
+)
+if [ "$memberships" != 2 ]; then
+  echo "ERRO: esperadas 2 roles com ADMIN, INHERIT e SET; encontradas: $memberships"
+  exit 1
+fi
 
 # Prova que executar novamente nao apaga tabelas/dados das aplicacoes.
 PGUSER=nucleo_app PGPASSWORD="$NUCLEO_DB_PASSWORD" PGDATABASE=oficina_db \
