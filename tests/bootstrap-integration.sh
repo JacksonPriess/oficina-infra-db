@@ -12,6 +12,10 @@ export PGPASSWORD=admin-test-only
 export BOOTSTRAP_DIR="$PWD/bootstrap"
 sh bootstrap/run.sh
 
+# Regressao: o criador mantem ADMIN OPTION e pode herdar/assumir ambas as roles.
+memberships=$(psql -X -w -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid WHERE m.member = current_user::regrole AND r.rolname IN ('nucleo_app', 'catalogo_produto_app') AND m.admin_option AND m.inherit_option AND m.set_option")
+[ "$memberships" = 2 ]
+
 # Prova que executar novamente nao apaga tabelas/dados das aplicacoes.
 PGUSER=nucleo_app PGPASSWORD="$NUCLEO_DB_PASSWORD" PGDATABASE=oficina_db \
   psql -X -w -v ON_ERROR_STOP=1 -c 'CREATE TABLE public.bootstrap_existing_data (id integer); INSERT INTO public.bootstrap_existing_data VALUES (42);'

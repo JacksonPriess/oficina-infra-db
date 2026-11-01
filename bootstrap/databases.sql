@@ -9,8 +9,8 @@ WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nucleo_app') \gexec
 SELECT 'CREATE ROLE catalogo_produto_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS'
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'catalogo_produto_app') \gexec
 
--- O administrador do RDS continua podendo administrar ambos os bancos.
-GRANT nucleo_app, catalogo_produto_app TO :"bootstrap_admin" WITH ADMIN TRUE, INHERIT TRUE, SET TRUE;
+-- O criador ja recebe ADMIN OPTION; aqui habilitamos apenas INHERIT e SET.
+GRANT nucleo_app, catalogo_produto_app TO :"bootstrap_admin" WITH INHERIT TRUE, SET TRUE;
 -- Falha se uma role preexistente foi elevada fora deste procedimento.
 DO $$
 BEGIN
