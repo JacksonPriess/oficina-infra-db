@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oficina-database-bootstrap
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: oficina-database-bootstrap
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: bootstrap
+          image: postgres:16-alpine
+          command: ["sh", "/bootstrap/run.sh"]
+          envFrom:
+            - secretRef:
+                name: oficina-database-bootstrap
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: scripts
+              mountPath: /bootstrap
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: oficina-database-bootstrap

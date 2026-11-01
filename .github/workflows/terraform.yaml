@@ -1,27 +1,42 @@
 name: CI/CD - Infra Database
 
 on:
+  workflow_dispatch:
+
   pull_request:
     branches:
       - main
     paths:
       - "terraform/**"
-      - ".github/workflows/terraform.yml"
+      - ".github/workflows/terraform.yaml"
+      - "bootstrap/**"
+      - "scripts/**"
+      - "tests/**"
 
   push:
     branches:
       - main
     paths:
       - "terraform/**"
-      - ".github/workflows/terraform.yml"
+      - ".github/workflows/terraform.yaml"
+      - "bootstrap/**"
+      - "scripts/**"
+      - "tests/**"
 
 env:
   AWS_REGION: us-east-1
   TF_WORKING_DIR: ./terraform
+  EKS_CLUSTER_NAME: oficina-api-dev-cluster
+  K8S_NAMESPACE: default
+
+concurrency:
+  group: oficina-infra-db-main
+  cancel-in-progress: false
 
 jobs:
   terraform:
     name: Terraform Database
+    needs: checks
     runs-on: ubuntu-latest
 
     steps:
@@ -58,6 +73,79 @@ jobs:
         run: terraform plan -no-color
 
       - name: Terraform Apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -auto-approve
+
+  bootstrap:
+    name: Preparar bancos e usuarios
+    needs: terraform
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configurar acesso ao Kubernetes
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+      - name: Criar e validar bancos e usuarios
+        env:
+          NUCLEO_DB_PASSWORD: ${{ secrets.NUCLEO_DB_PASSWORD }}
+          CATALOGO_DB_PASSWORD: ${{ secrets.CATALOGO_DB_PASSWORD }}
+        run: python3 scripts/bootstrap-databases.py
+
+  checks:
+    name: Validar bootstrap PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-test-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validar scripts e orquestracao
+        run: |
+          sh -n bootstrap/run.sh
+          python3 -m unittest discover -s tests -v
+
+      - name: Preparar cliente PostgreSQL
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes postgresql-client
+          fi
+
+      - name: Testar SQL, reexecucao e isolamento
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres-test-only
+          PGDATABASE: postgres
+          PGCONNECT_TIMEOUT: "10"
+          NUCLEO_DB_PASSWORD: "nucleo-test-only-1234'quoted"
+          CATALOGO_DB_PASSWORD: "catalogo-test-only-5678"
+        run: bash tests/bootstrap-integration.sh
