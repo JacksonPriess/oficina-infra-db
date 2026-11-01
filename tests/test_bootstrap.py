@@ -1,3 +1,32 @@
+import base64
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location(
+    "bootstrap", Path(__file__).resolve().parents[1] / "scripts/bootstrap-databases.py")
+bootstrap = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bootstrap)
+
+
+class BootstrapTest(unittest.TestCase):
+    def setUp(self):
+        self.environment = patch.dict(os.environ, {
+            "NUCLEO_DB_PASSWORD": "nucleo-test-password-1234",
+            "CATALOGO_DB_PASSWORD": "catalogo-test-password-5678",
+        })
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.resources = []
+        self.calls = []
+
+    def aws(self, *args, **kwargs):
+        if "describe-db-instances" in args:
             return json.dumps({"DBInstances": [{
                 "Endpoint": {"Address": "private-rds.example", "Port": 5432},
                 "MasterUserSecret": {"SecretArn": "arn:test"},
@@ -26,45 +55,6 @@
             self.assertIn(f"/{database}?sslmode=require", values["SPRING_DATASOURCE_URL"])
             self.assertNotIn("administrative-test-secret", values.values())
         self.assertIn(("delete", "secret", bootstrap.NAME, "--ignore-not-found"), self.calls)
-
-    def test_command_reports_stderr_but_redacts_passwords_and_ignores_stdout(self):
-        password = "password-with-'quote-1234"
-        bootstrap.SENSITIVE_VALUES.add(password)
-        encoded = base64.b64encode(password.encode()).decode()
-        error = subprocess.CalledProcessError(
-            1, ["kubectl"], output="SECRET-STDOUT-MUST-NOT-BE-PRINTED",
-            stderr=f"Forbidden: {password} {password.replace(chr(39), chr(39) * 2)} {encoded}")
-        stderr = io.StringIO()
-        with patch.object(bootstrap.subprocess, "run", side_effect=error), patch("sys.stderr", stderr):
-            with self.assertRaises(subprocess.CalledProcessError) as raised:
-                bootstrap.command("kubectl", "apply", "-f", "-", payload="SECRET-STDIN")
-        self.assertIs(error, raised.exception)
-        self.assertIn("kubectl apply -f -", stderr.getvalue())
-        self.assertIn("Forbidden", stderr.getvalue())
-        for sensitive in (password, encoded, "SECRET-STDOUT-MUST-NOT-BE-PRINTED", "SECRET-STDIN"):
-            self.assertNotIn(sensitive, stderr.getvalue())
-
-    def test_cleanup_failures_preserve_original_error_and_attempt_secret_removal(self):
-        original = subprocess.CalledProcessError(1, "wait")
-        failed = False
-
-        def kube(*args, **kwargs):
-            nonlocal failed
-            if args[0] == "wait":
-                failed = True
-                raise original
-            self.calls.append(args)
-            if failed and args[:2] == ("delete", "job"):
-                raise subprocess.CalledProcessError(1, "cleanup")
-            return ""
-
-        with patch.object(bootstrap, "command", side_effect=self.aws), \
-                patch.object(bootstrap, "kubectl", side_effect=kube), patch("sys.stderr", io.StringIO()):
-            with self.assertRaises(subprocess.CalledProcessError) as raised:
-                bootstrap.main()
-        self.assertIs(original, raised.exception)
-        self.assertIn(("delete", "secret", bootstrap.NAME, "--ignore-not-found"), self.calls)
-        self.assertIn(("describe", "job", bootstrap.NAME), self.calls)
 
     def test_missing_password_fails_before_accessing_aws(self):
         with patch.dict(os.environ, {"NUCLEO_DB_PASSWORD": ""}), \

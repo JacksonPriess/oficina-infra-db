@@ -1,35 +1,3 @@
-#!/usr/bin/env python3
-"""Provisiona bancos dentro da VPC, sem colocar senhas em argumentos ou arquivos."""
-import base64
-import json
-import os
-from pathlib import Path
-import subprocess
-import sys
-
-ROOT = Path(__file__).resolve().parents[1]
-NAMESPACE = os.environ.get("K8S_NAMESPACE", "default")
-REGION = os.environ.get("AWS_REGION", "us-east-1")
-NAME = "oficina-database-bootstrap"
-SENSITIVE_VALUES = set()
-
-
-def redact(value):
-    secrets = SENSITIVE_VALUES | {
-        os.environ.get(key, "") for key in (
-            "NUCLEO_DB_PASSWORD", "CATALOGO_DB_PASSWORD", "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
-        )
-    }
-    representations = set()
-    for secret_value in secrets - {""}:
-        representations.update((secret_value, secret_value.replace("'", "''"),
-                                json.dumps(secret_value)[1:-1],
-                                base64.b64encode(secret_value.encode()).decode()))
-    for representation in sorted(representations, key=len, reverse=True):
-        value = value.replace(representation, "[REDACTED]")
-    return value
-
 
 def command(*args, payload=None):
     try:
@@ -94,3 +62,67 @@ def main():
     for name, (_, _, password) in applications.items():
         existing = kubectl("get", "secret", name, "--ignore-not-found", "-o", "json")
         if existing:
+            stored = json.loads(existing)["data"].get("SPRING_DATASOURCE_PASSWORD", "")
+            if base64.b64decode(stored).decode() != password:
+                raise ValueError(f"Senha divergente em {name}. Rotacao exige procedimento separado.")
+
+    kubectl("delete", "job", NAME, "--ignore-not-found", "--wait=true")
+    try:
+        secret(NAME, {
+            "PGHOST": endpoint["Address"], "PGPORT": str(endpoint["Port"]),
+            "PGUSER": admin["username"], "PGPASSWORD": admin["password"],
+            "PGDATABASE": "postgres", "PGSSLMODE": "require", "PGCONNECT_TIMEOUT": "10",
+            **passwords,
+        })
+        apply({"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": NAME},
+               "data": {filename: (ROOT / "bootstrap" / filename).read_text()
+                        for filename in ("databases.sql", "run.sh")}})
+        kubectl("apply", "-f", str(ROOT / "bootstrap" / "job.yaml"))
+        kubectl("wait", "--for=condition=complete", f"job/{NAME}", "--timeout=360s")
+        for name, (database, username, password) in applications.items():
+            secret(name, {
+                "SPRING_DATASOURCE_URL": (
+                    f"jdbc:postgresql://{endpoint['Address']}:{endpoint['Port']}/{database}?sslmode=require"),
+                "SPRING_DATASOURCE_USERNAME": username,
+                "SPRING_DATASOURCE_PASSWORD": password,
+            })
+        print("Bootstrap concluido; Secrets separados das aplicacoes publicados no Kubernetes.")
+    except subprocess.CalledProcessError:
+        # Diagnostico do Job, com redacao das senhas inclusive em literais SQL.
+        try:
+            logs = kubectl("logs", f"job/{NAME}", "--tail=80", "--all-containers=true")
+            print(redact(logs), file=sys.stderr)
+        except subprocess.CalledProcessError:
+            print("Logs do Job indisponiveis; coletando estado e eventos antes da limpeza.", file=sys.stderr)
+        for diagnostic in (
+                ("get", "pods", "-l", f"app={NAME}", "-o", "wide"),
+                ("describe", "job", NAME),
+                ("describe", "pods", "-l", f"app={NAME}")):
+            try:
+                print(redact(kubectl(*diagnostic)), file=sys.stderr)
+            except subprocess.CalledProcessError:
+                print(f"Diagnostico indisponivel: {' '.join(diagnostic)}", file=sys.stderr)
+        raise
+    finally:
+        # Remove Pods antes de retirar a credencial administrativa temporaria.
+        failure_in_progress = sys.exc_info()[0] is not None
+        cleanup_error = None
+        for resource in ("job", "secret", "configmap"):
+            args = ("--wait=true",) if resource == "job" else ()
+            try:
+                kubectl("delete", resource, NAME, "--ignore-not-found", *args)
+            except subprocess.CalledProcessError as error:
+                cleanup_error = cleanup_error or error
+                print(f"Falha ao remover {resource}/{NAME}; verifique a limpeza manual.", file=sys.stderr)
+        if cleanup_error and not failure_in_progress:
+            raise cleanup_error
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except subprocess.CalledProcessError:
+        print("Falha no bootstrap. Consulte o comando e o erro detalhados acima.", file=sys.stderr)
+        sys.exit(1)
+    except (ValueError, KeyError) as error:
+        print(f"Configuracao invalida: {error}", file=sys.stderr)
