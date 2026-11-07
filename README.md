@@ -139,6 +139,26 @@ terraform apply -auto-approve
 
 realizando automaticamente o deploy da infraestrutura de banco na AWS.
 
+## Bancos de aplicação
+
+O job de bootstrap prepara três bancos lógicos na mesma instância RDS. Cada usuário possui permissões no próprio banco para executar as migrations do serviço.
+
+| Serviço | Banco | Usuário | Secret no Kubernetes |
+| --- | --- | --- | --- |
+| Núcleo | `oficina_db` | `nucleo_app` | `nucleo-database-secret` |
+| Catálogo de produtos | `oficina_produtos_db` | `catalogo_produto_app` | `catalogo-produto-database-secret` |
+| Financeiro | `oficina_financeiro_db` | `financeiro_app` | `financeiro-database-secret` |
+
+O workflow usa os GitHub Repository Secrets `NUCLEO_DB_PASSWORD`, `CATALOGO_DB_PASSWORD` e `FINANCEIRO_DB_PASSWORD`. As senhas devem ser diferentes e ter pelo menos 16 caracteres. O bootstrap verifica as credenciais já publicadas no cluster antes de executar o job e rejeita divergências, para que a rotação siga um procedimento separado.
+
+O job testa autenticação, criação de objetos e isolamento entre os bancos antes de publicar as credenciais. O Secret de cada serviço contém `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` e `SPRING_DATASOURCE_PASSWORD`. A URL JDBC exige SSL. As migrations do financeiro são aplicadas pelo Flyway da aplicação.
+
+Para verificar a publicação do Secret financeiro no namespace padrão:
+
+```bash
+kubectl -n default get secret financeiro-database-secret
+```
+
 ## Outputs
 
 Este projeto disponibiliza:

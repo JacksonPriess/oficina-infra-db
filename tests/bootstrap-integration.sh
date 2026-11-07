@@ -16,7 +16,7 @@ sh bootstrap/run.sh
 memberships=$(psql -X -w -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT count(*)
 FROM pg_roles r
-WHERE r.rolname IN ('nucleo_app', 'catalogo_produto_app')
+WHERE r.rolname IN ('nucleo_app', 'catalogo_produto_app', 'financeiro_app')
   AND pg_has_role(current_user, r.oid, 'USAGE')
   AND pg_has_role(current_user, r.oid, 'SET')
   AND EXISTS (
@@ -27,8 +27,8 @@ WHERE r.rolname IN ('nucleo_app', 'catalogo_produto_app')
   );
 SQL
 )
-if [ "$memberships" != 2 ]; then
-  echo "ERRO: esperadas 2 roles com ADMIN, INHERIT e SET; encontradas: $memberships"
+if [ "$memberships" != 3 ]; then
+  echo "ERRO: esperadas 3 roles com ADMIN, INHERIT e SET; encontradas: $memberships"
   exit 1
 fi
 
@@ -40,7 +40,8 @@ result=$(PGUSER=nucleo_app PGPASSWORD="$NUCLEO_DB_PASSWORD" PGDATABASE=oficina_d
   psql -X -w -At -v ON_ERROR_STOP=1 -c 'SELECT id FROM public.bootstrap_existing_data')
 [ "$result" = 42 ]
 
-# O administrador deve continuar acessando os dois bancos (consumidor Lambda atual).
+# O administrador deve continuar acessando os bancos de aplicacao, inclusive o nucleo (consumidor Lambda atual).
 PGDATABASE=oficina_db psql -X -w -v ON_ERROR_STOP=1 -c 'SELECT 1'
 PGDATABASE=oficina_produtos_db psql -X -w -v ON_ERROR_STOP=1 -c 'SELECT 1'
+PGDATABASE=oficina_financeiro_db psql -X -w -v ON_ERROR_STOP=1 -c 'SELECT 1'
 echo 'Integracao PostgreSQL validada.'
