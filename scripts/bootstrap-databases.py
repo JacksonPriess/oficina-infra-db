@@ -17,7 +17,8 @@ SENSITIVE_VALUES = set()
 def redact(value):
     secrets = SENSITIVE_VALUES | {
         os.environ.get(key, "") for key in (
-            "NUCLEO_DB_PASSWORD", "CATALOGO_DB_PASSWORD", "AWS_ACCESS_KEY_ID",
+            "NUCLEO_DB_PASSWORD", "CATALOGO_DB_PASSWORD", "FINANCEIRO_DB_PASSWORD",
+            "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
         )
     }
@@ -65,11 +66,11 @@ def secret(name, values):
 
 def main():
     passwords = {key: os.environ.get(key, "")
-                 for key in ("NUCLEO_DB_PASSWORD", "CATALOGO_DB_PASSWORD")}
+                 for key in ("NUCLEO_DB_PASSWORD", "CATALOGO_DB_PASSWORD", "FINANCEIRO_DB_PASSWORD")}
     if any(not value or len(value) < 16 for value in passwords.values()):
-        raise ValueError("Configure as duas senhas de aplicacao com pelo menos 16 caracteres.")
-    if len(set(passwords.values())) != 2:
-        raise ValueError("Use senhas diferentes para nucleo e catalogo.")
+        raise ValueError("Configure as tres senhas de aplicacao com pelo menos 16 caracteres.")
+    if len(set(passwords.values())) != len(passwords):
+        raise ValueError("Use senhas diferentes para nucleo, catalogo e financeiro.")
 
     command("aws", "rds", "wait", "db-instance-available", "--region", REGION,
             "--db-instance-identifier", "oficina-api-dev-postgres")
@@ -89,6 +90,8 @@ def main():
         "nucleo-database-secret": ("oficina_db", "nucleo_app", passwords["NUCLEO_DB_PASSWORD"]),
         "catalogo-produto-database-secret": (
             "oficina_produtos_db", "catalogo_produto_app", passwords["CATALOGO_DB_PASSWORD"]),
+        "financeiro-database-secret": (
+            "oficina_financeiro_db", "financeiro_app", passwords["FINANCEIRO_DB_PASSWORD"]),
     }
     # Nao rotaciona senhas silenciosamente enquanto as aplicacoes estao em execucao.
     for name, (_, _, password) in applications.items():

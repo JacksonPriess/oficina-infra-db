@@ -19,6 +19,7 @@ class BootstrapTest(unittest.TestCase):
         self.environment = patch.dict(os.environ, {
             "NUCLEO_DB_PASSWORD": "nucleo-test-password-1234",
             "CATALOGO_DB_PASSWORD": "catalogo-test-password-5678",
+            "FINANCEIRO_DB_PASSWORD": "financeiro-test-password-9012",
         })
         sensitive_values = patch.object(bootstrap, "SENSITIVE_VALUES", set())
         sensitive_values.start()
@@ -52,7 +53,8 @@ class BootstrapTest(unittest.TestCase):
         secrets = {r["metadata"]["name"]: r["data"] for r in self.resources if r["kind"] == "Secret"}
         for name, database, username in (
                 ("nucleo-database-secret", "oficina_db", "nucleo_app"),
-                ("catalogo-produto-database-secret", "oficina_produtos_db", "catalogo_produto_app")):
+                ("catalogo-produto-database-secret", "oficina_produtos_db", "catalogo_produto_app"),
+                ("financeiro-database-secret", "oficina_financeiro_db", "financeiro_app")):
             values = {key: base64.b64decode(value).decode() for key, value in secrets[name].items()}
             self.assertEqual(username, values["SPRING_DATASOURCE_USERNAME"])
             self.assertIn(f"/{database}?sslmode=require", values["SPRING_DATASOURCE_URL"])
@@ -99,14 +101,14 @@ class BootstrapTest(unittest.TestCase):
         self.assertIn(("describe", "job", bootstrap.NAME), self.calls)
 
     def test_missing_password_fails_before_accessing_aws(self):
-        with patch.dict(os.environ, {"NUCLEO_DB_PASSWORD": ""}), \
+        with patch.dict(os.environ, {"FINANCEIRO_DB_PASSWORD": ""}), \
                 patch.object(bootstrap, "command") as command:
             with self.assertRaises(ValueError):
                 bootstrap.main()
             command.assert_not_called()
 
     def test_equal_passwords_are_rejected(self):
-        with patch.dict(os.environ, {"CATALOGO_DB_PASSWORD": os.environ["NUCLEO_DB_PASSWORD"]}), \
+        with patch.dict(os.environ, {"FINANCEIRO_DB_PASSWORD": os.environ["NUCLEO_DB_PASSWORD"]}), \
                 patch.object(bootstrap, "command") as command:
             with self.assertRaises(ValueError):
                 bootstrap.main()
